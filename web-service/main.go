@@ -21,7 +21,7 @@ var albums = []Album{
 	{ID: "3", Title: "Sarah Vaughan and Clifford Brown", Artist: "Sarah Vaughan", Price: 39.99},
 }
 
-func getAlbums(w http.ResponseWriter) {
+func getAlbums(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(albums); err != nil {
 		log.Fatal("Error:", err)
@@ -64,17 +64,9 @@ func postAlbums(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	http.HandleFunc("/albums", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet {
-			getAlbums(w)
-		} else if r.Method == http.MethodPost {
-			postAlbums(w, r)
-		} else {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		}
-	})
-
-	http.HandleFunc("/albums/", getAlbumByID)
+	http.HandleFunc("GET /albums", getAlbums)
+	http.HandleFunc("POST /albums", postAlbums)
+	http.HandleFunc("GET /albums/{id}", getAlbumByID)
 
 	fmt.Println("Server running at http://localhost:8080")
 	if err := http.ListenAndServe(":8080", nil); err != nil {
