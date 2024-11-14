@@ -3,6 +3,12 @@ package main
 import (
 	"database/sql"
 	"log"
+	"sync"
+)
+
+var (
+	albums      []Album
+	albumsMutex sync.Mutex
 )
 
 func getAlbumsFromDB(db *sql.DB) ([]Album, error) {
@@ -17,13 +23,14 @@ func getAlbumsFromDB(db *sql.DB) ([]Album, error) {
 		}
 	}(rows)
 
-	var albums []Album
 	for rows.Next() {
 		var album Album
 		if err := rows.Scan(&album.ID, &album.Title, &album.Artist, &album.Price); err != nil {
 			return nil, err
 		}
+		albumsMutex.Lock()
 		albums = append(albums, album)
+		albumsMutex.Unlock()
 	}
 	return albums, nil
 }
