@@ -1,72 +1,40 @@
 package main
 
 import (
-	"encoding/json"
+	"database/sql"
 	"fmt"
 	"log"
 	"net/http"
-	"strconv"
+
+	_ "github.com/lib/pq"
 )
 
-type Album struct {
-	ID     string  `json:"id"`
-	Title  string  `json:"title"`
-	Artist string  `json:"artist"`
-	Price  float64 `json:"price"`
-}
-
-var albums = []Album{
-	{ID: "1", Title: "Blue Train", Artist: "John Coltrane", Price: 56.99},
-	{ID: "2", Title: "Jeru", Artist: "Gerry Mulligan", Price: 17.99},
-	{ID: "3", Title: "Sarah Vaughan and Clifford Brown", Artist: "Sarah Vaughan", Price: 39.99},
-}
-
-func getAlbums(w http.ResponseWriter, _ *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(albums); err != nil {
-		log.Fatal("Error:", err)
-	}
-}
-
-func getAlbumByID(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
-	id := r.URL.Path[len("/albums/"):]
-
-	for _, album := range albums {
-		if album.ID == id {
-			if err := json.NewEncoder(w).Encode(album); err != nil {
-				log.Fatal("Error:", err)
-			}
-
-			return
-		}
-	}
-	http.Error(w, "Album not found", http.StatusNotFound)
-}
-
-func postAlbums(w http.ResponseWriter, r *http.Request) {
-	var newAlbum Album
-
-	if err := json.NewDecoder(r.Body).Decode(&newAlbum); err != nil {
-		http.Error(w, "Invalid request payload", http.StatusBadRequest)
-		return
-	}
-
-	newAlbum.ID = strconv.Itoa(len(albums) + 1)
-	albums = append(albums, newAlbum)
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	if err := json.NewEncoder(w).Encode(newAlbum); err != nil {
-		log.Fatal("Error:", err)
-	}
+func initDB() (*sql.DB, error) {
+	connStr := "user=youruser dbname=yourdb sslmode=disable password=yourpassword host=localhost port=5432"
+	return sql.Open("postgres", connStr)
 }
 
 func main() {
-	http.HandleFunc("GET /albums", getAlbums)
-	http.HandleFunc("POST /albums", postAlbums)
-	http.HandleFunc("GET /albums/{id}", getAlbumByID)
+	db, err := initDB()
+	if err != nil {
+		log.Fatal("Failed to connect to the database:", err)
+	}
+	defer func(db *sql.DB) {
+		err := db.Close()
+		if err != nil {
+			log.Fatal("Failed to close the database:", err)
+		}
+	}(db)
+
+	http.HandleFunc("GET /albums", func(w http.ResponseWriter, r *http.Request) {
+		getAlbumsHandler(db, w, r)
+	})
+	http.HandleFunc("POST /albums", func(w http.ResponseWriter, r *http.Request) {
+		postAlbumsHandler(db, w, r)
+	})
+	http.HandleFunc("GET /albums/{id}", func(w http.ResponseWriter, r *http.Request) {
+		getAlbumByIDHandler(db, w, r)
+	})
 
 	fmt.Println("Server running at http://localhost:8080")
 	if err := http.ListenAndServe(":8080", nil); err != nil {
